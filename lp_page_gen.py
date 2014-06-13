@@ -9,14 +9,20 @@ import sys
     Lonely Planet XML to HTML Generator
 '''
 
-def walk_taxonomy(taxonomy_node, depth = 0):
-    for child in taxonomy_node:
-        if child.find('node_name') is None:
-            walk_taxonomy(child, depth)
+def walk(node, f_include = lambda: true, f_op = lambda node: None, depth = 0):
+    for child in node:
+        if not f_include(child):
+            walk(child, f_include, f_op, depth)
         else:
-            prefix = "\t" * depth;
-            print(prefix, child.find('node_name').text, child.attrib)
-            walk_taxonomy(child, depth+1)
+            f_op(child, depth) # todo: the parent node _may_ also be useful here!
+            walk(child, f_include, f_op, depth+1)
+
+def valid_taxonomy_node(node):
+    return node.find('node_name') is not None
+
+def print_taxonomy_node(node, depth):
+    prefix = "\t" * depth
+    print(prefix, node.find('node_name').text, node.attrib)
 
 def main():
     args_parser = ap.ArgumentParser()
@@ -29,9 +35,7 @@ def main():
     try:
         taxonomy_tree = et.parse(args.taxonomy_file)
 
-        walk_taxonomy(taxonomy_tree.getroot())
-        #for country in taxonomy_tree.getroot().iter('node'):
-        #    print(country.find('node_name').text, country.attrib)
+        walk(taxonomy_tree.getroot(), valid_taxonomy_node, print_taxonomy_node)
 
     except IOError as ex:
         print("XML Parsing Error:", str(ex))
