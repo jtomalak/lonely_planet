@@ -34,27 +34,41 @@ class TaxonomyNodeHtmlizer:
 # TODO asserts!
         self.template_file = template_file
         self.output_directory = output_directory
+        self.content_generator = lambda node : [ "There is no content loaded yet!" ]
+
+    def content_generator(content_gen):
+        self.content_generator = content_gen
+
+    def get_file_name(self, node):
+        fixed_name = node.find('node_name').text.replace(' ', '_') # TODO
+        return fixed_name + '.html'
 
     def __call__(self, node, parent, depth):
-        with open(self.template_file, 'r') as t: #TODO!
-            name = node.find('node_name').text
-            children = []
+        with open(self.template_file, 'r') as t:
+            name = node.find('node_name').text # TODO
+            links = []
+            if parent is not None and valid_taxonomy_node(parent):
+                links.append( { 'href': self.get_file_name(parent), 'caption': parent.find('node_name').text } )
+
             for child in node:
                 if valid_taxonomy_node(child):
-                    children.append(child.find('node_name').text)
+                    child_href = self.get_file_name(child)
+                    child_caption = child.find('node_name').text # TODO
+                    links.append( { 'href': child_href, 'caption': child_caption } )
 
-            text_content = [ "There is no content loaded yet!" ]
+            text_content = self.content_generator(node)
 
+            # TODO: with a bit of effort we can also put a wrapper around the templating implementation!
             template = jj.Template(t.read())
-            output_file = self.output_directory + '/out_' + name + '.html'
+            output_file = self.output_directory + '/' + self.get_file_name(node)
             with open(output_file, 'w') as o:
                 o.write( template.render(
-                    destinationname = name,
-                    child_destinations = children,
+                    destination_name = name,
+                    linked_destinations = links,
                     destination_content = text_content
                 ))
 
-#@profile
+@profile
 def main():
     args_parser = ap.ArgumentParser()
     args_parser.add_argument('taxonomy_file')
@@ -66,9 +80,9 @@ def main():
     try:
         taxonomy_tree = et.parse(args.taxonomy_file)
 
-        #walk(taxonomy_tree.getroot(), valid_taxonomy_node, print_taxonomy_node)
         htmlizer = TaxonomyNodeHtmlizer('lp_template.html', args.output_directory)
         walk(taxonomy_tree.getroot(), valid_taxonomy_node, htmlizer)
+        walk(taxonomy_tree.getroot(), valid_taxonomy_node, print_taxonomy_node)
 
         destinations_tree = et.parse(args.destinations_file)
 
