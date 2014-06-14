@@ -2,9 +2,11 @@
 
 from __future__ import print_function
 
+# TODO: UTF-8 support isn't ideal in Python,
+# so let's just ensure everything uses it by default
 import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
+#reload(sys)
+#sys.setdefaultencoding('utf-8')
 
 import xml.etree.ElementTree as et
 import argparse as ap
@@ -15,7 +17,9 @@ import jinja2 as jj
 '''
 # TODO: using place names for the html file names isn't ideal but it makes the files much more human readable, link them by node ID or something
 # TODO? Consider using lxml instead of the basic ElementTree (i.e. from lxml import ElementTree as et) - this however requires libxml
+# TODO! write up a quick XML generator to create a much LARGER set of sample files to better profile cpu/mem usage
 
+# TODO: refactor into a nicer top-level function with kwargs maybe
 def walk(node, f_op = lambda node: None, f_include = lambda node: True, parent = None, depth = 0):
     if f_include(node):
         f_op(node, parent, depth)
@@ -35,7 +39,7 @@ def print_taxonomy_node(node, parent, depth):
     print("[", depth, "]", prefix, node.find('node_name').text, "=>", parent_name)
 
 class TaxonomyNodeHtmlizer:
-    def __init__(self, template_file, content_gen = lambda node : [ "There is no content loaded yet!" ], output_directory = './'):
+    def __init__(self, template_file, content_gen, output_directory = './'):
 # TODO asserts!
         self.template_file = template_file
         self.output_directory = output_directory
@@ -50,7 +54,7 @@ class TaxonomyNodeHtmlizer:
             name = node.find('node_name').text # TODO
             links = []
             if parent is not None and valid_taxonomy_node(parent):
-                links.append( { 'href': self.get_file_name(parent), 'caption': parent.find('node_name').text } )
+                links.append( { 'href': self.get_file_name(parent), 'caption': parent.find('node_name').text } ) #TODO
 
             for child in node:
                 if valid_taxonomy_node(child):
@@ -64,14 +68,15 @@ class TaxonomyNodeHtmlizer:
             template = jj.Template(t.read())
             output_file = self.output_directory + '/' + self.get_file_name(node)
             with open(output_file, 'w') as o:
-                o.write( template.render(
+                output = template.render(
                     destination_name = name,
                     linked_destinations = links,
                     destination_content = text_content
-                ))
+                )
+                o.write( output.encode('utf-8') )
 
 
-
+#TODO: Unblob content text and making it more presentable
 class DestinationContentGenerator:
     def __init__(self, destinations_content_tree):
         self.content_tree = destinations_content_tree
@@ -101,6 +106,7 @@ class DestinationContentGenerator:
 
         return node_collector.content_map
 
+# uncomment this the line beginning with @ when running with the memory profiler
 #@profile
 def main():
     args_parser = ap.ArgumentParser()
@@ -116,7 +122,7 @@ def main():
 
         htmlizer = TaxonomyNodeHtmlizer('lp_template.html', DestinationContentGenerator(destinations_tree), args.output_directory)
         walk(taxonomy_tree.getroot(), htmlizer, valid_taxonomy_node)
-        walk(taxonomy_tree.getroot(), print_taxonomy_node, valid_taxonomy_node)
+        #walk(taxonomy_tree.getroot(), print_taxonomy_node, valid_taxonomy_node)
 
     except IOError as ex:
         print("XML Parsing Error:", str(ex))
