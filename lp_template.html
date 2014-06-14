@@ -10,7 +10,7 @@
         <div id="container">
             <div id="header">
                 <div id="logo"></div>
-                <h1>Lonely Planet: {{ destination name }}</h1>
+                <h1>Lonely Planet: {{ destinationname }}</h1>
             </div>
 
             <div id="wrapper">
@@ -21,7 +21,7 @@
                             <div class="inner">
                                 <ul id="navigation">
                                 {% for item in child_destinations %}
-                                    <li><a href="{{ item.href }}">{{ item.caption }}</a></li>
+                                    <li>{{ item }}</a></li>
                                 {% endfor %}
                                 </ul>
                             </div>
@@ -33,14 +33,14 @@
                 <div class="block">
                     <div class="secondary-navigation">
                         <ul>
-                            <li class="first"><a href="#">{{ destination name }}</a></li>
+                            <li class="first"><a href="#">{{ destinationname }}</a></li>
                         </ul>
                         <div class="clear"></div>
                     </div>
                     <div class="content">
                         <div class="inner">
                         {% for item in destination_content %}
-                            <p>{{ item.content }}</p>
+                            <p>{{ item }}</p>
                         {% endfor %}
                         </div>
                     </div>
