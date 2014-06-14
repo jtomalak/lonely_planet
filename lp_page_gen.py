@@ -11,6 +11,7 @@ import sys
 import xml.etree.ElementTree as et
 import argparse as ap
 import jinja2 as jj
+import re as re
 
 '''
     Lonely Planet XML to HTML Generator
@@ -64,6 +65,8 @@ class TaxonomyNodeHtmlizer:
 
             text_content = self.content_generator(node)
 
+            self.content_post_processing(text_content)
+
             # TODO: with a bit of effort we can also put a wrapper around the templating implementation!
             template = jj.Template(t.read())
             output_file = self.output_directory + '/' + self.get_file_name(node)
@@ -74,6 +77,14 @@ class TaxonomyNodeHtmlizer:
                     destination_content = text_content
                 )
                 o.write( output.encode('utf-8') )
+
+    def content_post_processing(self, content_list):
+        www_digger = re.compile(r'www\.[a-zA-Z0-9\./_]*') # TODO unhandled chars: -~:?#\[\]@!$&()\*+,;=
+        for idx in range(0, len(content_list)):
+            www_matches = www_digger.findall(content_list[idx])
+            for match in www_matches:
+                href_url = '<a href="http://' + match + '" target="_blank">' + match + '</a>'
+                content_list[idx] = content_list[idx].replace(match, href_url)
 
 
 #TODO: Unblob content text and making it more presentable
