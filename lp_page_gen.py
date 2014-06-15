@@ -16,8 +16,6 @@ import re as re
 '''
     Lonely Planet XML to HTML Generator
 '''
-# TODO: using place names for the html file names isn't ideal but it makes the files much more human readable, link them by node ID or something
-# TODO? Consider using lxml instead of the basic ElementTree (i.e. from lxml import ElementTree as xml_parser) - this however requires libxml
 # TODO! write up a quick XML generator to create a much LARGER set of sample files to better profile cpu/mem usage
 
 # TODO: refactor into a nicer top-level function with kwargs maybe
@@ -69,13 +67,17 @@ class DestinationTemplatePopulator:
     def __call__(self, node_name, connected_nodes, text_content):
         self.content_post_processing(text_content)
 
+        links = []
+        for node in connected_nodes:
+            links.append( { 'href': self.get_file_name(node), 'caption': node } )
+
         with open(self.template_file, 'r') as t:
             template = jj.Template(t.read())
             output_file = self.output_directory + '/' + self.get_file_name(node_name)
             with open(output_file, 'w') as o:
                 output = template.render(
                     destination_name = node_name,
-                    linked_destinations = connected_nodes,
+                    linked_destinations = links,
                     destination_content = text_content
                 )
                 o.write( output.encode('utf-8') )
@@ -86,22 +88,17 @@ class TaxonomyNodeHtmlizer:
         self.content_generator = content_gen
         self.html_generator = html_gen
 
-    def get_file_name(self, node_name):
-        return node_name.replace(' ', '_') + '.html'
-
     def __call__(self, node, parent, depth):
         node_name = node.find('node_name').text # TODO
         links = []
         if parent is not None and valid_taxonomy_node(parent):
-            parent_name = parent.find('node_name').text
-            links.append( { 'href': self.get_file_name(parent_name), 'caption': parent_name } )
+            links.append( parent.find('node_name').text )
 
         for child in node:
             if valid_taxonomy_node(child):
-                child_name = child.find('node_name').text # TODO
-                child_href = self.get_file_name(child_name)
-                links.append( { 'href': child_href, 'caption': child_name } )
+                links.append( child.find('node_name').text ) # TODO
 
+        # TODO: consider also moving this out...
         text_content = self.content_generator(node)
         self.html_generator(node_name, links, text_content)
 
