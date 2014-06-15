@@ -40,7 +40,8 @@
                     <div class="content">
                         <div class="inner">
                         {% for item in destination_content %}
-                            <p>{{ item }}</p>
+                            <h2>{{ item.title }}</h2>
+                            <p>{{ item.content }}</p>
                         {% endfor %}
                         </div>
                     </div>

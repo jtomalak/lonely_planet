@@ -81,10 +81,10 @@ class TaxonomyNodeHtmlizer:
     def content_post_processing(self, content_list):
         www_digger = re.compile(r'www\.[a-zA-Z0-9\./_]*') # TODO unhandled chars: -~:?#\[\]@!$&()\*+,;=
         for idx in range(0, len(content_list)):
-            www_matches = www_digger.findall(content_list[idx])
+            www_matches = www_digger.findall(content_list[idx]['content'])
             for match in www_matches:
                 href_url = '<a href="http://' + match + '" target="_blank">' + match + '</a>'
-                content_list[idx] = content_list[idx].replace(match, href_url)
+                content_list[idx]['content'] = content_list[idx]['content'].replace(match, href_url)
 
 
 #TODO: Unblob content text and making it more presentable
@@ -99,7 +99,10 @@ class DestinationContentGenerator:
         def __call__(self, node, parent, depth):
             node_text = node.text.strip()
             if node_text:
-                self.content_map.append(node_text)
+                self.content_map.append( {
+                    'title': node.tag.title().replace('_', ' '),
+                    'content': node_text
+                } )
 
     def _print_content_node(self, node, parent, depth):
         if node.text.strip():
