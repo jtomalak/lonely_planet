@@ -6,7 +6,7 @@ import sys
 import os
 import shutil
 
-import xml.etree.ElementTree as xml_parser
+import xml.etree.cElementTree as xml_parser
 import argparse as ap
 import jinja2 as jj
 from collections import OrderedDict
