@@ -82,11 +82,9 @@ class DestinationTemplatePopulator:
 
 
 class TaxonomyNodeHtmlizer:
-    def __init__(self, template_file, content_gen, output_directory = './'):
-# TODO asserts!
-        self.template_file = template_file
-        self.output_directory = output_directory
+    def __init__(self, content_gen, html_gen):
         self.content_generator = content_gen
+        self.html_generator = html_gen
 
     def get_file_name(self, node_name):
         return node_name.replace(' ', '_') + '.html'
@@ -105,8 +103,7 @@ class TaxonomyNodeHtmlizer:
                 links.append( { 'href': child_href, 'caption': child_name } )
 
         text_content = self.content_generator(node)
-        dtp = DestinationTemplatePopulator(self.template_file, self.output_directory)
-        dtp(node_name, links, text_content)
+        self.html_generator(node_name, links, text_content)
 
 #TODO: Unblob content text and making it more presentable
 class DestinationContentGenerator:
@@ -155,7 +152,10 @@ def main():
         taxonomy_tree = xml_parser.parse(args.taxonomy_file)
         destinations_tree = xml_parser.parse(args.destinations_file)
 
-        htmlizer = TaxonomyNodeHtmlizer('lp_template.html', DestinationContentGenerator(destinations_tree), args.output_directory)
+        htmlizer = TaxonomyNodeHtmlizer(
+            DestinationContentGenerator(destinations_tree),
+            DestinationTemplatePopulator('lp_template.html', args.output_directory)
+        )
         walk(taxonomy_tree.getroot(), htmlizer, valid_taxonomy_node)
         #walk(taxonomy_tree.getroot(), print_taxonomy_node, valid_taxonomy_node)
 
