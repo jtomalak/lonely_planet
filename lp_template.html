@@ -39,9 +39,11 @@
                     </div>
                     <div class="content">
                         <div class="inner">
-                        {% for item in destination_content %}
-                            <h2>{{ item.title }}</h2>
-                            <p>{{ item.content }}</p>
+                        {% for item_title, item_contents in destination_content.iteritems() %}
+                            <h2>{{ item_title }}</h2>
+                            {% for item_content in item_contents %}
+                                <p>{{ item_content }}</p>
+                            {% endfor %}
                         {% endfor %}
                         </div>
                     </div>

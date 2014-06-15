@@ -12,6 +12,7 @@ import xml.etree.ElementTree as xml_parser
 import argparse as ap
 import jinja2 as jj
 import re as re
+from collections import OrderedDict
 
 '''
     Lonely Planet XML to HTML Generator
@@ -54,9 +55,12 @@ class DestinationTemplatePopulator:
         self.output_directory = output_directory
 
     # TODO: this modifies the list, i.e. pass by reference and is too C-ish (blegh)
+    # In fact, I REALLY dislike this however not modifying in place feels like it would cost too
+    # much memory - so MEASURE it!
     def content_post_processing(self, content_list):
-        for idx in range(0, len(content_list)):
-            content_list[idx]['content'] = find_and_convert_url_to_href(content_list[idx]['content'])
+        for title_idx in content_list:
+            for text_idx in range(0, len(content_list[title_idx])):
+               content_list[title_idx][text_idx] = find_and_convert_url_to_href(content_list[title_idx][text_idx])
 
     def get_file_name(self, node_name):
         return node_name.replace(' ', '_') + '.html'
@@ -109,14 +113,15 @@ class DestinationContentGenerator:
 
     class ContentCollector:
         def __init__(self):
-            self.content_map = []
+            self.content_map = OrderedDict()
 
         def __call__(self, node, parent, depth):
             if node.text and node.text.strip() and node.tag:
-                self.content_map.append( {
-                    'title': node.tag.title().replace('_', ' '),
-                    'content': node.text.strip()
-                } )
+                title = node.tag.title().replace('_', ' ')
+                if title not in self.content_map:
+                    self.content_map[title] = [ node.text.strip() ]
+                else:
+                    self.content_map[title].append(node.text.strip())
 
     def _print_content_node(self, node, parent, depth):
         if node.text.strip():
