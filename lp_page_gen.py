@@ -46,22 +46,22 @@ class TaxonomyNodeHtmlizer:
         self.output_directory = output_directory
         self.content_generator = content_gen
 
-    def get_file_name(self, node):
-        fixed_name = node.find('node_name').text.replace(' ', '_') # TODO
-        return fixed_name + '.html'
+    def get_file_name(self, node_name):
+        return node_name.replace(' ', '_') + '.html'
 
     def __call__(self, node, parent, depth):
         with open(self.template_file, 'r') as t:
-            name = node.find('node_name').text # TODO
+            node_name = node.find('node_name').text # TODO
             links = []
             if parent is not None and valid_taxonomy_node(parent):
-                links.append( { 'href': self.get_file_name(parent), 'caption': parent.find('node_name').text } ) #TODO
+                parent_name = parent.find('node_name').text
+                links.append( { 'href': self.get_file_name(parent_name), 'caption': parent_name } )
 
             for child in node:
                 if valid_taxonomy_node(child):
-                    child_href = self.get_file_name(child)
-                    child_caption = child.find('node_name').text # TODO
-                    links.append( { 'href': child_href, 'caption': child_caption } )
+                    child_name = child.find('node_name').text # TODO
+                    child_href = self.get_file_name(child_name)
+                    links.append( { 'href': child_href, 'caption': child_name } )
 
             text_content = self.content_generator(node)
 
@@ -69,10 +69,10 @@ class TaxonomyNodeHtmlizer:
 
             # TODO: with a bit of effort we can also put a wrapper around the templating implementation!
             template = jj.Template(t.read())
-            output_file = self.output_directory + '/' + self.get_file_name(node)
+            output_file = self.output_directory + '/' + self.get_file_name(node_name)
             with open(output_file, 'w') as o:
                 output = template.render(
-                    destination_name = name,
+                    destination_name = node_name,
                     linked_destinations = links,
                     destination_content = text_content
                 )
