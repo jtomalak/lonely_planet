@@ -39,6 +39,19 @@ def print_taxonomy_node(node, parent, depth):
     parent_name = parent.find('node_name').text if depth != 0 else "root"
     print("[", depth, "]", prefix, node.find('node_name').text, "=>", parent_name)
 
+# Wrap strings that look like a URL starting with 'www.' in a href prefixed with 'http://'.
+# TODO/FIXME: This will also turn http://www. into an href but with two http:// prefixes.
+def find_and_convert_url_to_href(html_text):
+    if not html_text: return None
+
+    www_finder = re.compile(r'www\.[a-zA-Z0-9\./_]*') # TODO unhandled chars: -~:?#\[\]@!$&()\*+,;=
+    www_matches = www_finder.findall(html_text)
+    for match in www_matches:
+        href_url = '<a href="http://' + match + '" target="_blank">' + match + '</a>'
+        html_text = html_text.replace(match, href_url)
+
+    return html_text
+
 class TaxonomyNodeHtmlizer:
     def __init__(self, template_file, content_gen, output_directory = './'):
 # TODO asserts!
@@ -79,12 +92,8 @@ class TaxonomyNodeHtmlizer:
                 o.write( output.encode('utf-8') )
 
     def content_post_processing(self, content_list):
-        www_digger = re.compile(r'www\.[a-zA-Z0-9\./_]*') # TODO unhandled chars: -~:?#\[\]@!$&()\*+,;=
         for idx in range(0, len(content_list)):
-            www_matches = www_digger.findall(content_list[idx]['content'])
-            for match in www_matches:
-                href_url = '<a href="http://' + match + '" target="_blank">' + match + '</a>'
-                content_list[idx]['content'] = content_list[idx]['content'].replace(match, href_url)
+            content_list[idx]['content'] = find_and_convert_url_to_href(content_list[idx]['content'])
 
 
 #TODO: Unblob content text and making it more presentable
