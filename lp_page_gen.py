@@ -52,6 +52,34 @@ def find_and_convert_url_to_href(html_text):
 
     return html_text
 
+class DestinationTemplatePopulator:
+    def __init__(self, template_file, output_directory = './html_result'):
+        self.template_file = template_file
+        self.output_directory = output_directory
+
+    # TODO: this modifies the list, i.e. pass by reference and is too C-ish (blegh)
+    def content_post_processing(self, content_list):
+        for idx in range(0, len(content_list)):
+            content_list[idx]['content'] = find_and_convert_url_to_href(content_list[idx]['content'])
+
+    def get_file_name(self, node_name):
+        return node_name.replace(' ', '_') + '.html'
+
+    def __call__(self, node_name, connected_nodes, text_content):
+        self.content_post_processing(text_content)
+
+        with open(self.template_file, 'r') as t:
+            template = jj.Template(t.read())
+            output_file = self.output_directory + '/' + self.get_file_name(node_name)
+            with open(output_file, 'w') as o:
+                output = template.render(
+                    destination_name = node_name,
+                    linked_destinations = connected_nodes,
+                    destination_content = text_content
+                )
+                o.write( output.encode('utf-8') )
+
+
 class TaxonomyNodeHtmlizer:
     def __init__(self, template_file, content_gen, output_directory = './'):
 # TODO asserts!
@@ -63,38 +91,21 @@ class TaxonomyNodeHtmlizer:
         return node_name.replace(' ', '_') + '.html'
 
     def __call__(self, node, parent, depth):
-        with open(self.template_file, 'r') as t:
-            node_name = node.find('node_name').text # TODO
-            links = []
-            if parent is not None and valid_taxonomy_node(parent):
-                parent_name = parent.find('node_name').text
-                links.append( { 'href': self.get_file_name(parent_name), 'caption': parent_name } )
+        node_name = node.find('node_name').text # TODO
+        links = []
+        if parent is not None and valid_taxonomy_node(parent):
+            parent_name = parent.find('node_name').text
+            links.append( { 'href': self.get_file_name(parent_name), 'caption': parent_name } )
 
-            for child in node:
-                if valid_taxonomy_node(child):
-                    child_name = child.find('node_name').text # TODO
-                    child_href = self.get_file_name(child_name)
-                    links.append( { 'href': child_href, 'caption': child_name } )
+        for child in node:
+            if valid_taxonomy_node(child):
+                child_name = child.find('node_name').text # TODO
+                child_href = self.get_file_name(child_name)
+                links.append( { 'href': child_href, 'caption': child_name } )
 
-            text_content = self.content_generator(node)
-
-            self.content_post_processing(text_content)
-
-            # TODO: with a bit of effort we can also put a wrapper around the templating implementation!
-            template = jj.Template(t.read())
-            output_file = self.output_directory + '/' + self.get_file_name(node_name)
-            with open(output_file, 'w') as o:
-                output = template.render(
-                    destination_name = node_name,
-                    linked_destinations = links,
-                    destination_content = text_content
-                )
-                o.write( output.encode('utf-8') )
-
-    def content_post_processing(self, content_list):
-        for idx in range(0, len(content_list)):
-            content_list[idx]['content'] = find_and_convert_url_to_href(content_list[idx]['content'])
-
+        text_content = self.content_generator(node)
+        dtp = DestinationTemplatePopulator(self.template_file, self.output_directory)
+        dtp(node_name, links, text_content)
 
 #TODO: Unblob content text and making it more presentable
 class DestinationContentGenerator:
