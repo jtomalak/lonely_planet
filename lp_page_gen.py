@@ -112,11 +112,10 @@ class DestinationContentGenerator:
             self.content_map = []
 
         def __call__(self, node, parent, depth):
-            node_text = node.text.strip()
-            if node_text:
+            if node.text and node.text.strip() and node.tag:
                 self.content_map.append( {
                     'title': node.tag.title().replace('_', ' '),
-                    'content': node_text
+                    'content': node.text.strip()
                 } )
 
     def _print_content_node(self, node, parent, depth):
