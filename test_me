@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+/usr/bin/env python -m memory_profiler lp_page_gen.py sample_files/taxonomy.xml sample_files/destinations.xml ./html_result
