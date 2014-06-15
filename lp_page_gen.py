@@ -29,9 +29,6 @@ def walk(node, f_op = lambda node: None, f_include = lambda node: True, parent =
 
         walk(child, f_op, f_include, c_parent, c_depth)
 
-def valid_taxonomy_node(node):
-    return node.find('node_name') is not None
-
 def print_taxonomy_node(node, parent, depth):
     prefix = "   " * depth
     parent_name = parent.find('node_name').text if depth != 0 else "root"
@@ -88,14 +85,17 @@ class TaxonomyNodeHtmlizer:
         self.content_generator = content_gen
         self.html_generator = html_gen
 
+    def valid_taxonomy_node(self, node):
+        return node.find('node_name') is not None
+
     def __call__(self, node, parent, depth):
         node_name = node.find('node_name').text # TODO
         links = []
-        if parent is not None and valid_taxonomy_node(parent):
+        if parent is not None and self.valid_taxonomy_node(parent):
             links.append( parent.find('node_name').text )
 
         for child in node:
-            if valid_taxonomy_node(child):
+            if self.valid_taxonomy_node(child):
                 links.append( child.find('node_name').text ) # TODO
 
         # TODO: consider also moving this out...
@@ -153,8 +153,8 @@ def main():
             DestinationContentGenerator(destinations_tree),
             DestinationTemplatePopulator('lp_template.html', args.output_directory)
         )
-        walk(taxonomy_tree.getroot(), htmlizer, valid_taxonomy_node)
-        #walk(taxonomy_tree.getroot(), print_taxonomy_node, valid_taxonomy_node)
+        walk(taxonomy_tree.getroot(), htmlizer, htmlizer.valid_taxonomy_node)
+        #walk(taxonomy_tree.getroot(), print_taxonomy_node, htmlizer.valid_taxonomy_node)
 
     except IOError as ex:
         print("XML Parsing Error:", str(ex))
