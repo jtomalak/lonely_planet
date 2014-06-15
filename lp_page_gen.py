@@ -53,20 +53,26 @@ class DestinationTemplatePopulator:
     def __init__(self, template_file, output_directory = './html_result'):
         self.template_file = template_file
         self.output_directory = output_directory
+        self.content_post_processors = []
+
+    def add_content_postprocessor(self, post_proc):
+        self.content_post_processors.append(post_proc)
+        return self
 
     # TODO: this modifies the list, i.e. pass by reference and is too C-ish (blegh)
     # In fact, I REALLY dislike this however not modifying in place feels like it would cost too
     # much memory - so MEASURE it!
-    def content_post_processing(self, content_list):
-        for title_idx in content_list:
-            for text_idx in range(0, len(content_list[title_idx])):
-               content_list[title_idx][text_idx] = find_and_convert_url_to_href(content_list[title_idx][text_idx])
+    def _content_post_processing(self, content_list):
+        for post_proc in self.content_post_processors:
+            for title_idx in content_list:
+                for text_idx in range(0, len(content_list[title_idx])):
+                   content_list[title_idx][text_idx] = post_proc(content_list[title_idx][text_idx])
 
     def get_file_name(self, node_name):
         return node_name.replace(' ', '_') + '.html'
 
     def __call__(self, node_name, connected_nodes, text_content):
-        self.content_post_processing(text_content)
+        self._content_post_processing(text_content)
 
         links = []
         for node in connected_nodes:
@@ -156,6 +162,7 @@ def main():
         htmlizer = TaxonomyNodeHtmlizer(
             DestinationContentGenerator(destinations_tree),
             DestinationTemplatePopulator('lp_template.html', args.output_directory)
+                .add_content_postprocessor(find_and_convert_url_to_href)
         )
         walk(taxonomy_tree.getroot(), htmlizer, htmlizer.valid_taxonomy_node)
         #walk(taxonomy_tree.getroot(), print_taxonomy_node, htmlizer.valid_taxonomy_node)
