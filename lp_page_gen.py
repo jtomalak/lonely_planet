@@ -9,7 +9,6 @@ import shutil
 import xml.etree.ElementTree as xml_parser
 import argparse as ap
 import jinja2 as jj
-import re as re
 from collections import OrderedDict
 
 # Import from our current path works fine on Linux, but who knows elsewhere?
@@ -141,7 +140,7 @@ def create_directory_structure_and_copy_files(output_directory):
     lp_req.create_css_file(output_directory + '/static')
 
 # uncomment this the line beginning with @ when running with the memory profiler
-@profile
+#@profile
 def main():
     args_parser = ap.ArgumentParser()
     args_parser.add_argument('taxonomy_file')
