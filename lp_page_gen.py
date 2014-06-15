@@ -8,7 +8,7 @@ import sys
 #reload(sys)
 #sys.setdefaultencoding('utf-8')
 
-import xml.etree.ElementTree as et
+import xml.etree.ElementTree as xml_parser
 import argparse as ap
 import jinja2 as jj
 import re as re
@@ -17,7 +17,7 @@ import re as re
     Lonely Planet XML to HTML Generator
 '''
 # TODO: using place names for the html file names isn't ideal but it makes the files much more human readable, link them by node ID or something
-# TODO? Consider using lxml instead of the basic ElementTree (i.e. from lxml import ElementTree as et) - this however requires libxml
+# TODO? Consider using lxml instead of the basic ElementTree (i.e. from lxml import ElementTree as xml_parser) - this however requires libxml
 # TODO! write up a quick XML generator to create a much LARGER set of sample files to better profile cpu/mem usage
 
 # TODO: refactor into a nicer top-level function with kwargs maybe
@@ -131,8 +131,8 @@ def main():
     args = args_parser.parse_args()
 
     try:
-        taxonomy_tree = et.parse(args.taxonomy_file)
-        destinations_tree = et.parse(args.destinations_file)
+        taxonomy_tree = xml_parser.parse(args.taxonomy_file)
+        destinations_tree = xml_parser.parse(args.destinations_file)
 
         htmlizer = TaxonomyNodeHtmlizer('lp_template.html', DestinationContentGenerator(destinations_tree), args.output_directory)
         walk(taxonomy_tree.getroot(), htmlizer, valid_taxonomy_node)
