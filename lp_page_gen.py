@@ -29,9 +29,11 @@ def walk(node, f_op = lambda node: None, f_include = lambda node: True, parent =
         walk(child, f_op, f_include, c_parent, c_depth)
 
 class DestinationTemplatePopulator:
-    def __init__(self, template, output_directory = './html_result'):
+    def __init__(self, template, **kwargs):
+        no_gen = lambda : None
         self.template = jj.Template(template)
-        self.output_directory = output_directory
+        self.output_directory = './html_result' if 'output_directory' not in kwargs else kwargs['output_directory']
+        self.content_generator = no_gen if 'content_generator' not in kwargs else kwargs['content_generator']
         self.content_post_processors = []
 
     def add_content_postprocessor(self, post_proc):
@@ -50,12 +52,16 @@ class DestinationTemplatePopulator:
     def get_file_name(self, node_name):
         return node_name.replace(' ', '_') + '.html'
 
-    def __call__(self, node_name, connected_nodes, text_content):
+    def __call__(self, node_name, node_id, connected_nodes):
         if not node_name: # kind of silly, maybe assert?
             print('Warning: Attempting to generate content for node with no name.')
             return
 
-        self._content_post_processing(text_content)
+        text_content = self.content_generator(node_id)
+        if not text_content:
+            print('Warning: No content was found for', node_name)
+        else:
+            self._content_post_processing(text_content)
 
         links = []
         for node in connected_nodes:
@@ -72,9 +78,8 @@ class DestinationTemplatePopulator:
 
 
 class TaxonomyNodeHtmlizer:
-    def __init__(self, content_gen, html_gen):
-        self.content_generator = content_gen
-        self.html_generator = html_gen
+    def __init__(self, gen):
+        self.generator = gen
 
     def valid_taxonomy_node(self, node):
         return node.find('node_name') is not None
@@ -89,12 +94,7 @@ class TaxonomyNodeHtmlizer:
             if self.valid_taxonomy_node(child):
                 links.append( child.find('node_name').text ) # TODO
 
-        # TODO: consider also moving this out...
-        node_id = node.get('atlas_node_id')
-        text_content = self.content_generator(node_id)
-        if not text_content:
-            print('Warning: No content was found for', node_name)
-        self.html_generator(node_name, links, text_content)
+        self.generator(node_name, node.get('atlas_node_id'), links)
 
 class DestinationContentGenerator:
     def __init__(self, destinations_content_tree):
@@ -186,10 +186,12 @@ def main():
         sys.exit(1)
 
     try:
-        htmlizer = TaxonomyNodeHtmlizer(
-            DestinationContentGenerator(destinations_tree),
-            DestinationTemplatePopulator(lp_req.get_template(), args.output_directory)
+        html_gen = DestinationTemplatePopulator(
+                lp_req.get_template(),
+                content_generator = DestinationContentGenerator(destinations_tree),
+                output_directory = args.output_directory
         )
+        htmlizer = TaxonomyNodeHtmlizer( html_gen )
         walk(taxonomy_tree.getroot(), htmlizer, htmlizer.valid_taxonomy_node)
 
     except (IOError, xml_parser.ParseError) as ex:
