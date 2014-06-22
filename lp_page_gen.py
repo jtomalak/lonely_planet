@@ -33,7 +33,6 @@ class DestinationTemplatePopulator:
         no_gen = lambda : None
         self.template = jj.Template(template)
         self.output_directory = './html_result' if 'output_directory' not in kwargs else kwargs['output_directory']
-        self.content_generator = no_gen if 'content_generator' not in kwargs else kwargs['content_generator']
         self.content_post_processors = []
 
     def add_content_postprocessor(self, post_proc):
@@ -52,12 +51,11 @@ class DestinationTemplatePopulator:
     def get_file_name(self, node_name):
         return node_name.replace(' ', '_') + '.html'
 
-    def __call__(self, node_name, node_id, connected_nodes):
+    def __call__(self, node_name, node_id, connected_nodes, text_content):
         if not node_name: # kind of silly, maybe assert?
             print('Warning: Attempting to generate content for node with no name.')
             return
 
-        text_content = self.content_generator(node_id)
         if not text_content:
             print('Warning: No content was found for', node_name)
         else:
@@ -97,14 +95,16 @@ class TaxonomyNodeHtmlizer:
         self.generator(node_name, node.get('atlas_node_id'), links)
 
 class DestinationContentGenerator:
-    def __init__(self, destinations_content_tree):
-        self.content_tree = destinations_content_tree
+    def __init__(self, destinations_content_nodes, destination_nodes, generator):
+        self.content_nodes = destinations_content_nodes
+        self.destination_nodes = destination_nodes
+        self.generator = generator
 
     class ContentCollector:
         def __init__(self):
             self.content_map = OrderedDict()
 
-        def __call__(self, node, parent, depth):
+        def find_text_in_all_nodes(self, node):
             if node.text and node.text.strip() and node.tag:
                 title = node.tag.title().replace('_', ' ')
                 if title not in self.content_map:
@@ -112,27 +112,64 @@ class DestinationContentGenerator:
                 else:
                     self.content_map[title].append(node.text.strip())
 
-    def _print_content_node(self, node, parent, depth):
-        if node.text.strip():
-            print(node.tag)
-            print(node.text.strip())
+            for child in node.iterchildren():
+                self.find_text_in_all_nodes(child)
 
-    def __call__(self, node_id):
-        node_collector = self.ContentCollector()
-        if node_id is None:
-            return node_collector.content_map
+            return self.content_map
 
-        try:
-            xpath = "destination[@atlas_id='" + node_id + "']"
-            destination_nodes = self.content_tree.findall(xpath)
+    def _print_no_content_warning(self, node):
+        print(
+            'WARNING: Destination node',
+            node.get('title'),
+            'appears to have no associated taxonomy node, so no content will be generated.'
+        )
 
-            for dest in destination_nodes:
-                walk(dest, node_collector)
+    def _print_no_tax_node_warning(self, node):
+        print(
+            'WARNING: Destination node',
+            node.get('title'),
+            'has a node id that is not present in the taxonomy, so no content will be generated.'
+        )
 
-            return node_collector.content_map
-        except xml_parser.ParseError as ex:
-            print("Problem when parsing destination XML file:", str(ex))
-            raise
+    def process_node(self, node):
+        node_id = node.get('atlas_id')
+
+        if not node_id:
+            self._print_no_content_warning(node)
+            return;
+
+        if node_id not in self.destination_nodes:
+            self._print_no_tax_node_warning(node)
+            return;
+
+        node_name = self.destination_nodes[node_id]['name']
+        connected_nodes = self.destination_nodes[node_id]['children']
+        collector = self.ContentCollector()
+        text_content = collector.find_text_in_all_nodes(node)
+
+        self.generator(node_name, node_id, connected_nodes, text_content)
+        del collector
+
+    @profile
+    def parse(self):
+        for event, node in self.content_nodes:
+            print(mem_usage())
+            self.process_node(node)
+
+            node.clear()
+            while node.getprevious() is not None:
+                del node.getparent()[0]
+
+class TaxonomyNodeTreeBuilder:
+    def __init__(self):
+        self.nodes = OrderedDict()
+
+    def __call__(self, node_name, node_id, connected_nodes):
+        self.nodes[node_id] = {
+            'name': node_name,
+            'id': node_id,
+            'children': connected_nodes
+        }
 
 def create_directory_structure_and_copy_files(output_directory):
     os.mkdir(output_directory)
@@ -140,7 +177,7 @@ def create_directory_structure_and_copy_files(output_directory):
     lp_req.create_css_file(output_directory + '/static')
 
 # uncomment this the line beginning with @ when running with the memory profiler
-@profile
+#@profile
 def main():
     args_parser = ap.ArgumentParser()
     args_parser.add_argument('taxonomy_file')
@@ -180,19 +217,20 @@ def main():
         sys.exit(1)
 
     try:
-        destinations_tree = xml_parser.parse(args.destinations_file)
+        #destinations_tree = xml_parser.parse(args.destinations_file)
+        destinations_tree = xml_parser.iterparse(args.destinations_file, tag = 'destination', events = ('end',))
     except (IOError, xml_parser.ParseError) as ex:
         print("Error in destinations file (" + args.destinations_file + ":)", str(ex))
         sys.exit(1)
 
     try:
-        html_gen = DestinationTemplatePopulator(
-                lp_req.get_template(),
-                content_generator = DestinationContentGenerator(destinations_tree),
-                output_directory = args.output_directory
-        )
-        htmlizer = TaxonomyNodeHtmlizer( html_gen )
+        node_tree_gen = TaxonomyNodeTreeBuilder()
+        htmlizer = TaxonomyNodeHtmlizer( node_tree_gen )
         walk(taxonomy_tree.getroot(), htmlizer, htmlizer.valid_taxonomy_node)
+
+        html_gen = DestinationTemplatePopulator(lp_req.get_template(), output_directory = args.output_directory)
+        content_gen = DestinationContentGenerator(destinations_tree, node_tree_gen.nodes, html_gen)
+        content_gen.parse()
 
     except (IOError, xml_parser.ParseError) as ex:
         print("Error encountered during processing, aborting! File generation will be incomplete!", str(ex))
