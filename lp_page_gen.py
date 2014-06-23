@@ -150,16 +150,19 @@ class DestinationContentGenerator:
         self.generator(node_name, node_id, connected_nodes, text_content)
         del collector
 
-    @profile
     def parse(self):
         for event, node in self.content_nodes:
-            print(mem_usage())
             self.process_node(node)
 
             node.clear()
-            while node.getprevious() is not None:
-                del node.getparent()[0]
+            for ancestor in node.xpath('ancestor-or-self::*'):
+                while ancestor.getprevious() is not None:
+                    del ancestor.getparent()[0]
 
+        del self.content_nodes
+        self.content_nodes = None
+
+# TODO: how do we provide an iterable interface for a class?
 class TaxonomyNodeTreeBuilder:
     def __init__(self):
         self.nodes = OrderedDict()
@@ -177,6 +180,7 @@ def create_directory_structure_and_copy_files(output_directory):
     lp_req.create_css_file(output_directory + '/static')
 
 # uncomment this the line beginning with @ when running with the memory profiler
+# WARNING: with the memory profile active, this script runs ~10 times slower!
 #@profile
 def main():
     args_parser = ap.ArgumentParser()
@@ -212,25 +216,31 @@ def main():
 
     try:
         taxonomy_tree = xml_parser.parse(args.taxonomy_file)
+        node_tree_gen = TaxonomyNodeTreeBuilder()
+        htmlizer = TaxonomyNodeHtmlizer( node_tree_gen )
+        walk(taxonomy_tree.getroot(), htmlizer, htmlizer.valid_taxonomy_node)
+        del taxonomy_tree
     except (IOError, xml_parser.ParseError) as ex:
         print("Error in taxonomy file(" + args.taxonomy_file + "):", str(ex))
         sys.exit(1)
 
     try:
-        #destinations_tree = xml_parser.parse(args.destinations_file)
-        destinations_tree = xml_parser.iterparse(args.destinations_file, tag = 'destination', events = ('end',))
+        destinations_iterparser = xml_parser.iterparse(args.destinations_file, tag = 'destination', events = ('end',))
+        html_gen = DestinationTemplatePopulator(lp_req.get_template(), output_directory = args.output_directory)
+        content_gen = DestinationContentGenerator(
+            destinations_iterparser,
+            node_tree_gen.nodes,
+            html_gen
+        )
+        content_gen.parse()
+        del content_gen
+
     except (IOError, xml_parser.ParseError) as ex:
         print("Error in destinations file (" + args.destinations_file + ":)", str(ex))
         sys.exit(1)
 
     try:
-        node_tree_gen = TaxonomyNodeTreeBuilder()
-        htmlizer = TaxonomyNodeHtmlizer( node_tree_gen )
-        walk(taxonomy_tree.getroot(), htmlizer, htmlizer.valid_taxonomy_node)
-
-        html_gen = DestinationTemplatePopulator(lp_req.get_template(), output_directory = args.output_directory)
-        content_gen = DestinationContentGenerator(destinations_tree, node_tree_gen.nodes, html_gen)
-        content_gen.parse()
+        print('ok finished')
 
     except (IOError, xml_parser.ParseError) as ex:
         print("Error encountered during processing, aborting! File generation will be incomplete!", str(ex))
