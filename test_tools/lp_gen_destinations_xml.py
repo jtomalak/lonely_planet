@@ -5,6 +5,7 @@ from __future__ import print_function
 import sys
 from lxml import etree as xml_parser
 import argparse as ap
+from collections import OrderedDict as odict
 
 import string
 import random
@@ -34,10 +35,15 @@ def build_child_node_impl(depth, node):
 def create_content_xml_file(filename, num_nodes, num_children, child_depth):
     root_node = xml_parser.Element('destinations')
 
+    nodes = []
+
     for num in range(num_nodes):
         dest_node = xml_parser.Element('destination')
-        dest_node.set('atlas-id', str(num).zfill(8))
-        dest_node.set('title', rstring_generator(random.randint(5,12)))
+        node_id = str(num).zfill(8)
+        node_title = rstring_generator(random.randint(5,12))
+        dest_node.set('atlas-id', node_id)
+        dest_node.set('title', node_title)
+        nodes.append( (node_id, node_title) )
         root_node.append(dest_node)
 
         for _ in range(num_children):
@@ -52,9 +58,43 @@ def create_content_xml_file(filename, num_nodes, num_children, child_depth):
             xml_declaration = True
         )
 
+    del root_node
+    return nodes
+
+# TODO: for now we just create a flat taxonomy node tree
+def create_taxonomy_xml_file(filename, nodes):
+    root_node = xml_parser.Element('taxonomies')
+    taxonomy_root_node = xml_parser.Element('taxonomy')
+    taxonomy_node = xml_parser.Element('taxonomy_name')
+    taxonomy_node.text = 'World'
+    taxonomy_root_node.append(taxonomy_node)
+
+    for (node_id, node_title) in nodes:
+        taxonomy_node = xml_parser.Element('node')
+        taxonomy_node.set('atlas_node_id', node_id)
+        taxonomy_name = xml_parser.Element('node_name')
+        taxonomy_name.text = node_title
+        taxonomy_node.append(taxonomy_name)
+        taxonomy_root_node.append(taxonomy_node)
+
+    root_node.append(taxonomy_root_node)
+
+    with open(filename, 'w') as xml_file:
+        xml_doc = xml_parser.ElementTree(root_node)
+        xml_doc.write(
+            xml_file,
+            pretty_print = True,
+            encoding = 'UTF-8',
+            xml_declaration = True
+        )
+
+    del root_node
+
+@profile
 def main():
     args_parser = ap.ArgumentParser()
-    args_parser.add_argument('out')
+    args_parser.add_argument('out_dest')
+    args_parser.add_argument('out_tax')
     args_parser.add_argument('nodes')
     args_parser.add_argument('--children')
     args_parser.add_argument('--depth')
@@ -83,7 +123,8 @@ def main():
         print('ERROR: children argument must be an integer')
         return 1
 
-    create_content_xml_file(args.out, num_nodes, num_children, child_depth)
+    nodes = create_content_xml_file(args.out_dest, num_nodes, num_children, child_depth)
+    create_taxonomy_xml_file(args.out_tax, nodes)
 
     return 0
 
